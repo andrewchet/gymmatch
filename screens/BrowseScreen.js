@@ -1,107 +1,108 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, Image } from 'react-native';
-import { Card, Text, Button } from 'react-native-paper';
-import { useNavigation } from '@react-navigation/native';
-import AdityaPic from '../assets/adityauser1.jpg'; // Make sure this exists in your assets folder!
-
-// Profiles can now support both local and remote images
-const fakeProfiles = [
-  {
-    id: '1',
-    name: 'Aditya, 27',
-    image: AdityaPic,
-    prompts: [
-      'Passionate about tech and fitness.',
-      'Looking for meaningful connections.',
-      'Always down for a hike or a hackathon.',
-    ],
-  },
-  {
-    id: '2',
-    name: 'Taylor, 24',
-    image: 'https://placebear.com/400/400',
-    prompts: [
-      'Love a good leg day.',
-      'Looking for someone to push me.',
-      'I’ve never missed a Monday.',
-    ],
-  },
-];
-
-const likedUsersGlobal = [];
+import { View, StyleSheet, ScrollView, Image, TouchableOpacity } from 'react-native';
+import { Card, Text, IconButton, Menu, Button } from 'react-native-paper';
+import dummyProfiles from './dummyProfiles';
 
 const BrowseScreen = () => {
   const [index, setIndex] = useState(0);
-  const navigation = useNavigation();
+  const [likedPrompts, setLikedPrompts] = useState([]);
+  const [likedPhotos, setLikedPhotos] = useState([]);
+  const [ageMenuVisible, setAgeMenuVisible] = useState(false);
+  const [goalMenuVisible, setGoalMenuVisible] = useState(false);
+  const [locationMenuVisible, setLocationMenuVisible] = useState(false);
 
-  const handleLike = () => {
-    likedUsersGlobal.push(fakeProfiles[index]);
-    handleNext();
+  const profile = dummyProfiles[index];
+
+  const togglePromptLike = (prompt) => {
+    setLikedPrompts((prev) =>
+      prev.includes(prompt) ? prev.filter((p) => p !== prompt) : [...prev, prompt]
+    );
   };
 
-  const handleNext = () => {
-    if (index < fakeProfiles.length - 1) {
-      setIndex(index + 1);
-    } else {
-      navigation.navigate('ChatList', { likedUsers: likedUsersGlobal });
-    }
-  };
-
-  const profile = fakeProfiles[index];
-
-  // Helper to handle both local and remote images
-  const getImageSource = (img) => {
-    return typeof img === 'string' ? { uri: img } : img;
+  const togglePhotoLike = (uri) => {
+    setLikedPhotos((prev) =>
+      prev.includes(uri) ? prev.filter((u) => u !== uri) : [...prev, uri]
+    );
   };
 
   return (
-    <View style={styles.container}>
-      {profile ? (
-        <Card style={styles.card}>
-          <Image source={getImageSource(profile.image)} style={styles.image} />
-          <Card.Content>
-            <Text variant="titleLarge">{profile.name}</Text>
-            {profile.prompts.map((p, i) => (
-              <Text key={i} style={styles.prompt}>“{p}”</Text>
-            ))}
-          </Card.Content>
-          <Card.Actions style={styles.actions}>
-            <Button icon="close" textColor="red" onPress={handleNext}>Pass</Button>
-            <Button icon="heart" textColor="green" onPress={handleLike}>Like</Button>
-          </Card.Actions>
-        </Card>
-      ) : (
-        <Text>No more profiles.</Text>
-      )}
-    </View>
+    <ScrollView contentContainerStyle={styles.container}>
+      <View style={styles.filterRow}>
+        <Menu
+          visible={ageMenuVisible}
+          onDismiss={() => setAgeMenuVisible(false)}
+          anchor={<Button onPress={() => setAgeMenuVisible(true)}>Age</Button>}
+        >
+          <Menu.Item title="18-25" />
+          <Menu.Item title="26-35" />
+          <Menu.Item title="36+" />
+        </Menu>
+        <Menu
+          visible={goalMenuVisible}
+          onDismiss={() => setGoalMenuVisible(false)}
+          anchor={<Button onPress={() => setGoalMenuVisible(true)}>Goal</Button>}
+        >
+          <Menu.Item title="Build Muscle" />
+          <Menu.Item title="Lose Weight" />
+          <Menu.Item title="Improve Endurance" />
+        </Menu>
+        <Menu
+          visible={locationMenuVisible}
+          onDismiss={() => setLocationMenuVisible(false)}
+          anchor={<Button onPress={() => setLocationMenuVisible(true)}>Location</Button>}
+        >
+          <Menu.Item title="NYC" />
+          <Menu.Item title="LA" />
+          <Menu.Item title="Remote" />
+        </Menu>
+      </View>
+
+      <Card style={styles.card}>
+        <Card.Content>
+          <Text variant="titleLarge" style={styles.name}>{profile.name}</Text>
+        </Card.Content>
+        <ScrollView horizontal pagingEnabled>
+          {profile.images.map((uri, i) => (
+            <View key={i} style={styles.imageContainer}>
+              <Image source={{ uri }} style={styles.image} />
+              <IconButton
+                icon={likedPhotos.includes(uri) ? 'heart' : 'heart-outline'}
+                iconColor={likedPhotos.includes(uri) ? 'red' : 'gray'}
+                size={24}
+                style={styles.photoHeart}
+                onPress={() => togglePhotoLike(uri)}
+              />
+            </View>
+          ))}
+        </ScrollView>
+        <Card.Content>
+          {profile.prompts.map((p, i) => (
+            <View key={i} style={styles.promptRow}>
+              <Text style={styles.prompt}>“{p}”</Text>
+              <IconButton
+                icon={likedPrompts.includes(p) ? 'heart' : 'heart-outline'}
+                iconColor={likedPrompts.includes(p) ? 'red' : 'gray'}
+                size={20}
+                onPress={() => togglePromptLike(p)}
+              />
+            </View>
+          ))}
+        </Card.Content>
+      </Card>
+    </ScrollView>
   );
 };
 
 export default BrowseScreen;
 
-export { likedUsersGlobal };
-
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    padding: 15,
-  },
-  card: {
-    borderRadius: 15,
-    elevation: 4,
-    overflow: 'hidden',
-  },
-  image: {
-    height: 350,
-    width: '100%',
-  },
-  prompt: {
-    marginVertical: 5,
-    fontSize: 16,
-  },
-  actions: {
-    justifyContent: 'space-around',
-    marginVertical: 15,
-  },
+  container: { padding: 15, gap: 10 },
+  card: { borderRadius: 15, overflow: 'hidden' },
+  name: { marginBottom: 10 },
+  imageContainer: { position: 'relative' },
+  image: { width: 350, height: 350, borderRadius: 10 },
+  photoHeart: { position: 'absolute', top: 10, right: 10, backgroundColor: 'white' },
+  promptRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginVertical: 5 },
+  prompt: { flex: 1, marginRight: 10, fontSize: 16 },
+  filterRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 15 },
 });
