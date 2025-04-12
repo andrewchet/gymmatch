@@ -1,58 +1,75 @@
-import React from 'react';
-import { View, StyleSheet } from 'react-native';
-import { Text, Button } from 'react-native-paper';
+// OnboardingScreen.js
+import React, { useState } from 'react';
+import { View, StyleSheet, Alert } from 'react-native';
+import { TextInput, Button, Text } from 'react-native-paper';
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
+import { auth } from '../firebaseConfig';
 
-const OnboardingScreen = ({ navigation }) => (
-  <View style={styles.container}>
-    <Text variant="headlineMedium">Welcome to FitMatch</Text>
-    <Text style={styles.subtext}>Find gym partners that match your vibe</Text>
-    <Button mode="contained" onPress={() => navigation.navigate('Questionnaire')} style={styles.button}>
-      Get Started
-    </Button>
-  </View>
-);
-
-export default OnboardingScreen;
-
-const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
-  subtext: { marginVertical: 20, textAlign: 'center' },
-  button: { marginTop: 20, width: '80%' },
-});
-
-// Sign-Up Screen
-const SignUpScreen = ({ navigation }) => {
+const OnboardingScreen = ({ navigation }) => {
+  const [isSignUp, setIsSignUp] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
-  const handleSignUp = async () => {
+  const handleAuth = async () => {
     try {
-      await createUserWithEmailAndPassword(auth, email, password);
-      Alert.alert('Success', 'Account created successfully!');
-      navigation.navigate('Profile');
+      if (isSignUp) {
+        await createUserWithEmailAndPassword(auth, email, password);
+      } else {
+        await signInWithEmailAndPassword(auth, email, password);
+      }
+      navigation.replace('Questionnaire');
     } catch (error) {
-      Alert.alert('Error', error.message);
+      Alert.alert('Authentication Error', error.message);
     }
   };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Sign Up</Text>
+      <Text variant="titleLarge" style={styles.title}>{isSignUp ? 'Sign Up' : 'Log In'}</Text>
       <TextInput
-        style={styles.input}
-        placeholder="Email"
+        label="Email"
         value={email}
         onChangeText={setEmail}
+        style={styles.input}
         keyboardType="email-address"
+        autoCapitalize="none"
       />
       <TextInput
-        style={styles.input}
-        placeholder="Password"
+        label="Password"
         value={password}
         onChangeText={setPassword}
+        style={styles.input}
         secureTextEntry
       />
-      <Button title="Sign Up" onPress={handleSignUp} />
+      <Button mode="contained" onPress={handleAuth} style={styles.button}>
+        {isSignUp ? 'Sign Up' : 'Log In'}
+      </Button>
+      <Button onPress={() => setIsSignUp(!isSignUp)} style={styles.link}>
+        {isSignUp ? 'Already have an account? Log in' : 'Need an account? Sign up'}
+      </Button>
     </View>
   );
 };
+
+export default OnboardingScreen;
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    justifyContent: 'center',
+    padding: 20,
+  },
+  input: {
+    marginBottom: 15,
+  },
+  button: {
+    marginVertical: 10,
+  },
+  link: {
+    alignSelf: 'center',
+  },
+  title: {
+    textAlign: 'center',
+    marginBottom: 30,
+  },
+});

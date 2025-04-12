@@ -1,61 +1,74 @@
+// screens/QuestionnaireScreen.js
 import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, Image, TouchableOpacity } from 'react-native';
-import { TextInput, Button, Text, Avatar, Menu, Divider } from 'react-native-paper';
+import { View, StyleSheet, ScrollView, Image, TouchableOpacity, Alert } from 'react-native';
+import { TextInput, Button, Text } from 'react-native-paper';
 import * as ImagePicker from 'expo-image-picker';
+import { db, auth } from '../firebaseConfig';
+import { doc, setDoc } from 'firebase/firestore';
 
-const fitnessGoalsList = [
-  'Lose Weight', 'Build Muscle', 'Increase Flexibility', 'Improve Endurance',
-  'Get Toned', 'Train for a Race', 'Gain Strength', 'Improve Posture',
-  'Boost Energy', 'Stay Consistent'
+const fitnessGoals = [
+  'Build muscle', 'Lose weight', 'Gain endurance', 'Get toned',
+  'Improve flexibility', 'Train for competition', 'Feel healthier',
+  'Boost energy', 'Fix posture', 'Workout with friends'
 ];
 
 const hobbiesList = [
-  'Running', 'Yoga', 'Cycling', 'Swimming', 'Weightlifting',
-  'Hiking', 'Dancing', 'Pilates', 'Boxing', 'Rock Climbing'
+  'Hiking', 'Biking', 'Swimming', 'Running', 'Climbing',
+  'Dancing', 'Weightlifting', 'Yoga', 'Boxing', 'Rowing'
 ];
 
 const QuestionnaireScreen = ({ navigation }) => {
+  const [photos, setPhotos] = useState([]);
   const [form, setForm] = useState({
     name: '',
     age: '',
-    bio: '',
-    fitnessGoal: '',
-    hobby: '',
+    goals: '',
+    hobbies: '',
+    location: '',
   });
-  const [photos, setPhotos] = useState([]);
-  const [fitnessGoalMenuVisible, setFitnessGoalMenuVisible] = useState(false);
-  const [hobbyMenuVisible, setHobbyMenuVisible] = useState(false);
 
   const pickImage = async () => {
-    if (photos.length >= 4) return;
-
-    let result = await ImagePicker.launchImageLibraryAsync({
+    const result = await ImagePicker.launchImageLibraryAsync({
+      allowsMultipleSelection: true,
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsMultipleSelection: false,
       quality: 1,
     });
-
     if (!result.canceled) {
-      setPhotos([...photos, result.assets[0].uri]);
+      setPhotos(prev => [...prev, result.assets[0].uri].slice(0, 4));
     }
   };
 
-  const handleSubmit = () => {
-    // Save data or move to next screen
-    navigation.navigate('Browse');
+  const handleSubmit = async () => {
+    try {
+      const user = auth.currentUser;
+      if (!user) throw new Error("User not authenticated");
+
+      await setDoc(doc(db, "profiles", user.uid), {
+        ...form,
+        photos,
+        uid: user.uid,
+        timestamp: new Date().toISOString(),
+      });
+
+      Alert.alert("Success", "Profile saved!");
+      navigation.navigate('Browse');
+    } catch (error) {
+      console.error("Error saving profile: ", error);
+      Alert.alert("Error", error.message);
+    }
   };
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Text variant="titleLarge">Create Your Profile</Text>
-
+      
       <View style={styles.photoContainer}>
         {photos.map((uri, idx) => (
           <Image key={idx} source={{ uri }} style={styles.photo} />
         ))}
         {photos.length < 4 && (
-          <TouchableOpacity onPress={pickImage} style={styles.addPhoto}>
-            <Text>+ Add Photo</Text>
+          <TouchableOpacity onPress={pickImage} style={styles.uploadBox}>
+            <Text>+</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -74,91 +87,65 @@ const QuestionnaireScreen = ({ navigation }) => {
         style={styles.input}
       />
       <TextInput
-        label="Bio"
-        multiline
-        numberOfLines={3}
-        value={form.bio}
-        onChangeText={text => setForm({ ...form, bio: text })}
+        label="Location"
+        value={form.location}
+        onChangeText={text => setForm({ ...form, location: text })}
+        style={styles.input}
+      />
+      <TextInput
+        label="Fitness Goal"
+        value={form.goals}
+        onFocus={() =>
+          setForm({ ...form, goals: fitnessGoals[Math.floor(Math.random() * fitnessGoals.length)] })
+        }
+        style={styles.input}
+      />
+      <TextInput
+        label="Hobby"
+        value={form.hobbies}
+        onFocus={() =>
+          setForm({ ...form, hobbies: hobbiesList[Math.floor(Math.random() * hobbiesList.length)] })
+        }
         style={styles.input}
       />
 
-      {/* Fitness Goal Dropdown */}
-      <Menu
-        visible={fitnessGoalMenuVisible}
-        onDismiss={() => setFitnessGoalMenuVisible(false)}
-        anchor={
-          <Button mode="outlined" onPress={() => setFitnessGoalMenuVisible(true)} style={styles.input}>
-            {form.fitnessGoal || 'Select Fitness Goal'}
-          </Button>
-        }
-      >
-        {fitnessGoalsList.map((goal, i) => (
-          <Menu.Item
-            key={i}
-            title={goal}
-            onPress={() => {
-              setForm({ ...form, fitnessGoal: goal });
-              setFitnessGoalMenuVisible(false);
-            }}
-          />
-        ))}
-      </Menu>
-
-      {/* Hobby Dropdown */}
-      <Menu
-        visible={hobbyMenuVisible}
-        onDismiss={() => setHobbyMenuVisible(false)}
-        anchor={
-          <Button mode="outlined" onPress={() => setHobbyMenuVisible(true)} style={styles.input}>
-            {form.hobby || 'Select Hobby'}
-          </Button>
-        }
-      >
-        {hobbiesList.map((hobby, i) => (
-          <Menu.Item
-            key={i}
-            title={hobby}
-            onPress={() => {
-              setForm({ ...form, hobby });
-              setHobbyMenuVisible(false);
-            }}
-          />
-        ))}
-      </Menu>
-
-      <Button mode="contained" onPress={handleSubmit} style={styles.submitBtn}>
-        Save & Continue
+      <Button mode="contained" onPress={handleSubmit} style={styles.button}>
+        Save Profile
       </Button>
     </ScrollView>
   );
 };
 
+export default QuestionnaireScreen;
+
 const styles = StyleSheet.create({
-  container: { padding: 20 },
-  input: { marginVertical: 10 },
+  container: {
+    padding: 20,
+    paddingBottom: 50,
+  },
+  input: {
+    marginBottom: 15,
+  },
   photoContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
-    marginBottom: 15,
+    marginVertical: 10,
   },
   photo: {
-    width: 80,
-    height: 80,
-    borderRadius: 8,
+    width: 70,
+    height: 70,
+    marginRight: 10,
+    borderRadius: 10,
   },
-  addPhoto: {
-    width: 80,
-    height: 80,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#ccc',
+  uploadBox: {
+    width: 70,
+    height: 70,
+    borderRadius: 10,
+    backgroundColor: '#eee',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  submitBtn: {
+  button: {
     marginTop: 20,
   },
 });
-
-export default QuestionnaireScreen;
