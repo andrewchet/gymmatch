@@ -9,10 +9,6 @@ const BrowseScreen = () => {
   const [index, setIndex] = useState(0);
   const [profiles, setProfiles] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [ageMenuVisible, setAgeMenuVisible] = useState(false);
-  const [sportMenuVisible, setSportMenuVisible] = useState(false);
-  const [availabilityMenuVisible, setAvailabilityMenuVisible] = useState(false);
-  const [majorMenuVisible, setMajorMenuVisible] = useState(false);
   const [sortBySimilarity, setSortBySimilarity] = useState(true);
   const [currentUserProfile, setCurrentUserProfile] = useState(null);
 
@@ -343,57 +339,14 @@ const BrowseScreen = () => {
   return (
     <View style={styles.container}>
       <View style={styles.filterRow}>
-        <Menu
-          visible={ageMenuVisible}
-          onDismiss={() => setAgeMenuVisible(false)}
-          anchor={<Button onPress={() => setAgeMenuVisible(true)}>Age</Button>}
-        >
-          <Menu.Item title="18-25" />
-          <Menu.Item title="26-35" />
-          <Menu.Item title="36+" />
-        </Menu>
-        <Menu
-          visible={sportMenuVisible}
-          onDismiss={() => setSportMenuVisible(false)}
-          anchor={<Button onPress={() => setSportMenuVisible(true)}>Sport</Button>}
-        >
-          <Menu.Item title="Running" />
-          <Menu.Item title="Swimming" />
-          <Menu.Item title="Cycling" />
-          <Menu.Item title="Basketball" />
-          <Menu.Item title="Soccer" />
-          <Menu.Item title="Tennis" />
-          <Menu.Item title="Yoga" />
-          <Menu.Item title="CrossFit" />
-        </Menu>
-        <Menu
-          visible={availabilityMenuVisible}
-          onDismiss={() => setAvailabilityMenuVisible(false)}
-          anchor={<Button onPress={() => setAvailabilityMenuVisible(true)}>Availability</Button>}
-        >
-          <Menu.Item title="Morning" />
-          <Menu.Item title="Afternoon" />
-          <Menu.Item title="Evening" />
-          <Menu.Item title="Weekends" />
-          <Menu.Item title="Flexible" />
-        </Menu>
-        <Menu
-          visible={majorMenuVisible}
-          onDismiss={() => setMajorMenuVisible(false)}
-          anchor={<Button onPress={() => setMajorMenuVisible(true)}>Major</Button>}
-        >
-          <Menu.Item title="Computer Science" />
-          <Menu.Item title="Engineering" />
-          <Menu.Item title="Business" />
-          <Menu.Item title="Biology" />
-          <Menu.Item title="Psychology" />
-          <Menu.Item title="Other" />
-        </Menu>
+        <Text style={styles.sortLabel}>
+          {sortBySimilarity ? 'Showing Similar Profiles' : 'Showing Random Profiles'}
+        </Text>
         <Button 
           onPress={() => setSortBySimilarity(!sortBySimilarity)}
           style={styles.sortButton}
         >
-          {sortBySimilarity ? 'Random' : 'Similar'}
+          Switch to {sortBySimilarity ? 'Random' : 'Similar'}
         </Button>
       </View>
 
@@ -526,7 +479,12 @@ const styles = StyleSheet.create({
   image: { width: 350, height: 350, borderRadius: 10 },
   promptRow: { marginVertical: 5 },
   prompt: { fontSize: 16 },
-  filterRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 15 },
+  filterRow: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center',
+    marginBottom: 15 
+  },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   actionButtons: {
     flexDirection: 'row',
@@ -582,5 +540,10 @@ const styles = StyleSheet.create({
   divider: {
     marginTop: 10,
     marginBottom: 10,
+  },
+  sortLabel: {
+    fontSize: 16,
+    color: '#666',
+    fontWeight: '500'
   },
 });

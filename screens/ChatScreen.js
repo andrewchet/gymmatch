@@ -50,6 +50,7 @@ const ChatScreen = ({ route, navigation }) => {
           });
           
           setMessages(prevMessages => {
+            // Filter out any pending messages that are now confirmed
             const filteredMessages = prevMessages.filter(msg => 
               !(msg.senderId === currentUser.uid && msg.receiverId === otherUser.id && !msg.isPending)
             );
@@ -108,28 +109,6 @@ const ChatScreen = ({ route, navigation }) => {
       setIsSending(true);
       const messagesRef = collection(db, 'messages');
       
-      // Add optimistic UI update - create a temporary message to show instantly
-      const tempMessage = {
-        id: 'temp-' + Date.now(),
-        senderId: currentUser.uid,
-        receiverId: otherUser.id,
-        content: newMessage,
-        timestamp: new Date(), // Use client date for sorting until server timestamp arrives
-        isPending: true
-      };
-      
-      // Add the temporary message to the state immediately
-      setMessages(prevMessages => {
-        return [...prevMessages, tempMessage].sort((a, b) => {
-          const timeA = a.timestamp?.toDate?.() || a.timestamp || new Date(0);
-          const timeB = b.timestamp?.toDate?.() || b.timestamp || new Date(0);
-          return timeA - timeB;
-        });
-      });
-      
-      // Clear the input field immediately for better UX
-      setNewMessage('');
-      
       // Create the message data for Firebase
       const messageData = {
         senderId: currentUser.uid,
@@ -141,6 +120,9 @@ const ChatScreen = ({ route, navigation }) => {
       // Add the message to Firestore
       await addDoc(messagesRef, messageData);
       
+      // Clear the input field immediately for better UX
+      setNewMessage('');
+      
       // Scroll to bottom after the message is added
       if (flatListRef.current) {
         setTimeout(() => {
@@ -148,10 +130,6 @@ const ChatScreen = ({ route, navigation }) => {
         }, 100);
       }
     } catch (error) {
-      // If an error occurs, remove the temporary message
-      setMessages(prevMessages => 
-        prevMessages.filter(msg => !msg.isPending)
-      );
       Alert.alert('Error', 'Failed to send message: ' + error.message);
     } finally {
       setIsSending(false);
