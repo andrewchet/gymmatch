@@ -1,101 +1,44 @@
-import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
-import { Text, Avatar } from 'react-native-paper';
-import { collection, query, where, getDocs, doc, getDoc } from 'firebase/firestore';
+import React, { useEffect, useState } from 'react';
+import { View, FlatList, Text, StyleSheet, ActivityIndicator, Alert, TouchableOpacity } from 'react-native';
+import { collection, getDocs, doc, getDoc, query, where } from 'firebase/firestore';
 import { db, auth } from '../firebaseConfig';
+import { useNavigation } from '@react-navigation/native';
 
-const ChatListScreen = ({ navigation }) => {
-  const [matches, setMatches] = useState([]);
+const ChatListScreen = () => {
+  const [matchedUsers, setMatchedUsers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const navigation = useNavigation();
+  const currentUser = auth.currentUser;
 
   useEffect(() => {
     const fetchMatches = async () => {
       try {
-        const currentUser = auth.currentUser;
-        if (!currentUser) {
-          console.error('No user logged in');
-          Alert.alert('Error', 'You must be logged in to view matches');
-          setLoading(false);
-          return;
+        const matchesRef = collection(db, 'matches');
+        const matchesQuery = query(matchesRef, where('status', '==', 'matched'));
+        const snapshot = await getDocs(matchesQuery);
+
+        const users = [];
+
+        for (const docSnap of snapshot.docs) {
+          const data = docSnap.data();
+
+          if (!data.users || !data.users.includes(currentUser.uid)) continue;
+
+          const otherUserId = data.users.find(uid => uid !== currentUser.uid);
+          if (!otherUserId) continue;
+
+          const otherUserDoc = await getDoc(doc(db, 'profiles', otherUserId));
+
+          users.push({
+            id: otherUserId,
+            name: otherUserDoc.exists() ? otherUserDoc.data().name : otherUserId,
+          });
         }
 
-        console.log('Fetching matches for user:', currentUser.uid);
-
-        // Query for matches where the current user is involved
-        const matchesCollection = collection(db, 'matches');
-        
-        // First, try to get all matches and filter in memory
-        // This is a fallback approach if the security rules are causing issues
-        const matchesSnapshot = await getDocs(matchesCollection);
-        console.log('Total matches found:', matchesSnapshot.size);
-        
-        // Filter matches that involve the current user and have status 'matched'
-        const userMatches = matchesSnapshot.docs
-          .filter(doc => {
-            const data = doc.data();
-            return data.users && 
-                   data.users.includes(currentUser.uid) && 
-                   data.status === 'matched';
-          })
-          .map(doc => ({
-            id: doc.id,
-            ...doc.data()
-          }));
-        
-        console.log('User matches after filtering:', userMatches.length);
-        
-        // Fetch profiles for each match
-        const matchPromises = userMatches.map(async (matchData) => {
-          // Get the other user's ID (the one that's not the current user)
-          const otherUserId = matchData.users.find(id => id !== currentUser.uid);
-          console.log('Other user ID:', otherUserId);
-          
-          if (!otherUserId) {
-            console.error('Could not find other user ID in match:', matchData);
-            return null;
-          }
-          
-          // Fetch the other user's profile
-          try {
-            const profileDoc = await getDoc(doc(db, 'profiles', otherUserId));
-            if (!profileDoc.exists()) {
-              console.error('Profile not found for user:', otherUserId);
-              return null;
-            }
-            
-            const profileData = profileDoc.data();
-            console.log('Profile data for user:', otherUserId);
-            
-            return {
-              id: matchData.id,
-              matchTimestamp: matchData.timestamp,
-              lastUpdated: matchData.lastUpdated,
-              ...profileData
-            };
-          } catch (profileError) {
-            console.error('Error fetching profile for user:', otherUserId, profileError);
-            return null;
-          }
-        });
-
-        const matchesWithProfiles = (await Promise.all(matchPromises)).filter(match => match !== null);
-        console.log('Final matches with profiles:', matchesWithProfiles.length);
-        
-        if (matchesWithProfiles.length === 0) {
-          console.log('No matches found for user');
-        }
-        
-        // Sort matches by last updated time (most recent first)
-        const sortedMatches = matchesWithProfiles.sort((a, b) => {
-          const timeA = a.lastUpdated?.toDate?.() || new Date(0);
-          const timeB = b.lastUpdated?.toDate?.() || new Date(0);
-          return timeB - timeA;
-        });
-        
-        setMatches(sortedMatches);
-      } catch (error) {
-        console.error('Error fetching matches:', error);
-        Alert.alert('Error', 'Failed to fetch matches: ' + error.message);
+        setMatchedUsers(users);
+      } catch (err) {
+        console.error('Error loading matches:', err);
+        Alert.alert('Error', 'Could not load matches.');
       } finally {
         setLoading(false);
       }
@@ -104,97 +47,59 @@ const ChatListScreen = ({ navigation }) => {
     fetchMatches();
   }, []);
 
+  const startChat = (userId) => {
+    navigation.navigate('Chat', {
+      otherUser: { id: userId }
+    });
+  };
+
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
+      <View style={styles.centered}>
         <ActivityIndicator size="large" />
       </View>
     );
   }
 
+  if (matchedUsers.length === 0) {
+    return (
+      <View style={styles.centered}>
+        <Text>No matched users yet.</Text>
+      </View>
+    );
+  }
+
   return (
-    <View style={styles.container}>
-      <FlatList
-        data={matches}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <TouchableOpacity 
-            style={styles.matchItem}
-            onPress={() => navigation.navigate('Chat', { otherUser: item })}
-          >
-            <Avatar.Image 
-              size={50} 
-              source={{ uri: item.images?.[0] || 'https://via.placeholder.com/50' }} 
-              style={styles.avatar}
-            />
-            <View style={styles.matchInfo}>
-              <Text style={styles.name}>{item.name}</Text>
-              <Text style={styles.matchDate}>
-                Matched on {new Date(item.matchTimestamp?.toDate()).toLocaleDateString()}
-              </Text>
-            </View>
-          </TouchableOpacity>
-        )}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>No matches yet. Go like someone!</Text>
-          </View>
-        }
-      />
-    </View>
+    <FlatList
+      data={matchedUsers}
+      keyExtractor={(item) => item.id}
+      renderItem={({ item }) => (
+        <TouchableOpacity
+          style={styles.userCard}
+          onPress={() => startChat(item.id)}
+        >
+          <Text style={styles.username}>{item.name}</Text>
+        </TouchableOpacity>
+      )}
+    />
   );
 };
 
 export default ChatListScreen;
 
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    padding: 20,
-    backgroundColor: '#fff',
-  },
-  loadingContainer: {
+  centered: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  matchItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  userCard: {
+    backgroundColor: '#f9f9f9',
     padding: 15,
-    backgroundColor: '#f8f8f8',
-    borderRadius: 10,
-    marginBottom: 10,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
+    borderBottomWidth: 1,
+    borderBottomColor: '#ddd',
   },
-  avatar: {
-    marginRight: 15,
-  },
-  matchInfo: {
-    flex: 1,
-  },
-  name: {
+  username: {
     fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 5,
-  },
-  matchDate: {
-    fontSize: 14,
-    color: '#666',
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  emptyText: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
   },
 });

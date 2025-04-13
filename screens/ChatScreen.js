@@ -13,46 +13,7 @@ const ChatScreen = ({ route, navigation }) => {
   const currentUser = auth.currentUser;
 
   // Function to fetch messages where the other user is the sender
-  const fetchOtherUserMessages = async () => {
-    try {
-      console.log('Fetching messages where other user is sender:', otherUser.id);
-      const messagesRef = collection(db, 'messages');
-      
-      // Query for all messages where the other user is the sender
-      const otherUserMessagesQuery = query(
-        messagesRef,
-        where('senderId', '==', otherUser.id)
-      );
-      
-      const snapshot = await getDocs(otherUserMessagesQuery);
-      console.log('Found messages where other user is sender, count:', snapshot.size);
-      
-      const otherUserMessages = [];
-      snapshot.forEach((doc) => {
-        const data = doc.data();
-        // Check if the current user is the receiver or if the receiverId contains the current user's ID
-        if (data.receiverId === currentUser.uid || 
-            (typeof data.receiverId === 'string' && data.receiverId.includes(currentUser.uid))) {
-          console.log('Other user message:', { id: doc.id, ...data });
-          otherUserMessages.push({ id: doc.id, ...data });
-        }
-      });
-      
-      console.log('Other user messages count:', otherUserMessages.length);
-      
-      // Update messages state with other user messages
-      setMessages(prevMessages => {
-        // Filter out any existing messages from the other user
-        const filteredMessages = prevMessages.filter(msg => 
-          !(msg.senderId === otherUser.id)
-        );
-        // Add new messages from the other user
-        return [...filteredMessages, ...otherUserMessages];
-      });
-    } catch (error) {
-      console.error('Error fetching other user messages:', error);
-    }
-  };
+
 
   useEffect(() => {
     if (!currentUser) {
@@ -142,7 +103,7 @@ const ChatScreen = ({ route, navigation }) => {
         });
         
         // Also try to fetch all messages where the other user is the sender
-        await fetchOtherUserMessages();
+
         
         return () => {
           console.log('Cleaning up message listeners');
