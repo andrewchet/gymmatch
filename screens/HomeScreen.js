@@ -40,6 +40,21 @@ const HomeScreen = ({ navigation }) => (
           Messages
         </Button>
       </Surface>
+      
+      <Surface style={styles.card} elevation={3}>
+        <Text variant="titleMedium" style={styles.cardTitle}>Your Profile</Text>
+        <Text variant="bodyMedium" style={styles.cardDescription}>
+          View and edit your profile information
+        </Text>
+        <Button 
+          mode="outlined" 
+          onPress={() => navigation.navigate('Questionnaire', { editMode: true })} 
+          style={styles.button}
+          icon="account-edit"
+        >
+          Edit Profile
+        </Button>
+      </Surface>
     </View>
   </View>
 );

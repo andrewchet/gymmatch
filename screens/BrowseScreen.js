@@ -23,9 +23,10 @@ const BrowseScreen = () => {
     // Compare age (closer ages get higher scores)
     if (currentUserProfile.age && otherProfile.age) {
       const ageDiff = Math.abs(currentUserProfile.age - otherProfile.age);
-      if (ageDiff <= 2) similarityScore += 5;
-      else if (ageDiff <= 5) similarityScore += 3;
-      else if (ageDiff <= 10) similarityScore += 1;
+      if (ageDiff <= 1) similarityScore += 5;  // Same year or 1 year difference
+      else if (ageDiff <= 2) similarityScore += 3;  // 2 years difference
+      else if (ageDiff <= 4) similarityScore += 1;  // 3-4 years difference (still in college range)
+      // No points for age difference > 4 years (unlikely in college setting)
     }
     
     // Compare major (exact match gets points)
@@ -416,7 +417,7 @@ const BrowseScreen = () => {
         <Card.Content>
           {sortBySimilarity && profile.similarityScore > 0 && (
             <View style={styles.matchesContainer}>
-              <Text style={styles.sectionTitle}>Matching Fields</Text>
+              <Text style={styles.sectionTitle}>Similarities</Text>
               {getMatchingFields(profile).map((match, index) => (
                 <View key={index} style={styles.matchItem}>
                   <Text style={styles.matchField}>{match.field}:</Text>

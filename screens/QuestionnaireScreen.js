@@ -5,7 +5,7 @@ import { TextInput, Button, Text, Chip, Checkbox } from 'react-native-paper';
 import { doc, updateDoc, getDoc } from 'firebase/firestore';
 import { auth, db } from '../firebaseConfig';
 
-const QuestionnaireScreen = ({ navigation }) => {
+const QuestionnaireScreen = ({ navigation, route }) => {
   const [name, setName] = useState('');
   const [age, setAge] = useState('');
   const [major, setMajor] = useState('');
@@ -26,6 +26,9 @@ const QuestionnaireScreen = ({ navigation }) => {
   const availabilityOptions = ['Mondays', 'Tuesdays', 'Wednesdays', 'Thursdays', 'Fridays', 'Saturdays', 'Sundays', 'Mornings', 'Afternoons', 'Evenings'];
   const liftingExpertiseOptions = ['Beginner', 'Intermediate', 'Advanced', 'Expert'];
 
+  // Check if we're in edit mode
+  const isEditMode = route.params?.editMode || false;
+
   useEffect(() => {
     const checkExistingProfile = async () => {
       try {
@@ -40,6 +43,21 @@ const QuestionnaireScreen = ({ navigation }) => {
 
         if (profileDoc.exists()) {
           const profileData = profileDoc.data();
+          
+          // If in edit mode, populate the form with existing data
+          if (isEditMode) {
+            setName(profileData.name || '');
+            setAge(profileData.age ? profileData.age.toString() : '');
+            setMajor(profileData.major || '');
+            setSelectedSports(profileData.sports || []);
+            setSelectedAvailability(profileData.availability || []);
+            setSelectedLiftingExpertise(profileData.liftingExpertise || '');
+            setGoals(profileData.goals || '');
+            setFunFact(profileData.funFact || '');
+            setLoading(false);
+            return;
+          }
+          
           // Check if the profile has the required fields
           if (profileData.name && profileData.age && profileData.major && profileData.sports && profileData.availability && 
               profileData.liftingExpertise && profileData.goals && profileData.funFact) {
@@ -57,7 +75,7 @@ const QuestionnaireScreen = ({ navigation }) => {
     };
 
     checkExistingProfile();
-  }, [navigation]);
+  }, [navigation, isEditMode]);
 
   const handleSubmit = async () => {
     try {
@@ -127,7 +145,9 @@ const QuestionnaireScreen = ({ navigation }) => {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        <Text variant="titleLarge" style={styles.title}>Complete Your Profile</Text>
+        <Text variant="titleLarge" style={styles.title}>
+          {isEditMode ? 'Edit Your Profile' : 'Complete Your Profile'}
+        </Text>
 
         <View style={styles.section}>
           <TextInput
@@ -228,7 +248,7 @@ const QuestionnaireScreen = ({ navigation }) => {
           onPress={handleSubmit} 
           style={styles.button}
         >
-          Complete Profile
+          {isEditMode ? 'Save Changes' : 'Complete Profile'}
         </Button>
       </ScrollView>
     </KeyboardAvoidingView>
