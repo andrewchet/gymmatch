@@ -1,7 +1,7 @@
 // In your ChatScreen.js
 import React, { useState, useEffect } from 'react';
 import { View, Text, FlatList, TextInput, Button, ActivityIndicator, Alert } from 'react-native';
-import { collection, addDoc, query, where, orderBy, onSnapshot, doc, getDoc, setDoc, getDocs, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, query, where, onSnapshot, doc, getDoc, setDoc, getDocs, serverTimestamp } from 'firebase/firestore';
 import { db, auth } from '../firebaseConfig';
 
 const ChatScreen = ({ route, navigation }) => {
@@ -37,10 +37,11 @@ const ChatScreen = ({ route, navigation }) => {
       try {
         // Check for existing messages
         const messagesRef = collection(db, 'messages');
+        
+        // Use a simple query that doesn't require a composite index
         const messagesQuery = query(
           messagesRef,
-          where('chatId', '==', uniqueChatId),
-          orderBy('timestamp', 'asc')
+          where('chatId', '==', uniqueChatId)
         );
         
         console.log('Setting up real-time listener for messages...');
@@ -57,6 +58,13 @@ const ChatScreen = ({ route, navigation }) => {
             messageList.push({ id: doc.id, ...data });
           });
           
+          // Sort messages by timestamp manually
+          messageList.sort((a, b) => {
+            const timeA = a.timestamp?.toDate?.() || new Date(0);
+            const timeB = b.timestamp?.toDate?.() || new Date(0);
+            return timeA - timeB;
+          });
+          
           console.log('Setting messages state with count:', messageList.length);
           setMessages(messageList);
           setLoading(false);
@@ -69,11 +77,7 @@ const ChatScreen = ({ route, navigation }) => {
         });
         
         // If no messages exist, create an initial system message
-        const initialQuery = query(
-          messagesRef,
-          where('chatId', '==', uniqueChatId)
-        );
-        const initialSnapshot = await getDocs(initialQuery);
+        const initialSnapshot = await getDocs(messagesQuery);
         
         if (initialSnapshot.empty) {
           console.log('No existing messages found, creating initial message');
