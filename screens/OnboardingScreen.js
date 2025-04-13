@@ -1,6 +1,6 @@
 // OnboardingScreen.js
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, Alert } from 'react-native';
+import { View, StyleSheet, Alert, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { TextInput, Button, Text } from 'react-native-paper';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
@@ -81,42 +81,54 @@ const OnboardingScreen = ({ navigation }) => {
   };
 
   return (
-    <View style={styles.container}>
-      <Text variant="titleLarge" style={styles.title}>{isSignUp ? 'Sign Up' : 'Log In'}</Text>
-      
-      {firestoreWorking === false && (
-        <Text style={styles.errorText}>Warning: Database connection issue detected</Text>
-      )}
-      
-      <TextInput
-        label="Email"
-        value={email}
-        onChangeText={setEmail}
-        style={styles.input}
-        keyboardType="email-address"
-        autoCapitalize="none"
-      />
-      <TextInput
-        label="Password"
-        value={password}
-        onChangeText={setPassword}
-        style={styles.input}
-        secureTextEntry
-      />
+    <KeyboardAvoidingView 
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={styles.container}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0}
+    >
+      <ScrollView 
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <Text variant="titleLarge" style={styles.title}>{isSignUp ? 'Sign Up' : 'Log In'}</Text>
+        
+        {firestoreWorking === false && (
+          <Text style={styles.errorText}>Warning: Database connection issue detected</Text>
+        )}
+        
+        <TextInput
+          label="Email"
+          value={email}
+          onChangeText={setEmail}
+          style={styles.input}
+          keyboardType="email-address"
+          autoCapitalize="none"
+        />
+        <TextInput
+          label="Password"
+          value={password}
+          onChangeText={setPassword}
+          style={styles.input}
+          secureTextEntry
+        />
 
-      <Button mode="contained" onPress={handleAuth} style={styles.button}>
-        {isSignUp ? 'Sign Up' : 'Log In'}
-      </Button>
-      <Button onPress={() => setIsSignUp(!isSignUp)} style={styles.link}>
-        {isSignUp ? 'Already have an account? Log in' : 'Need an account? Sign up'}
-      </Button>
-    </View>
+        <Button mode="contained" onPress={handleAuth} style={styles.button}>
+          {isSignUp ? 'Sign Up' : 'Log In'}
+        </Button>
+        <Button onPress={() => setIsSignUp(!isSignUp)} style={styles.link}>
+          {isSignUp ? 'Already have an account? Log in' : 'Need an account? Sign up'}
+        </Button>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
     justifyContent: 'center',
     padding: 20,
   },

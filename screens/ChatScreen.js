@@ -1,8 +1,8 @@
-// In your ChatScreen.js
-import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, TextInput, Button, ActivityIndicator, Alert } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, FlatList, TextInput, ActivityIndicator, Alert, KeyboardAvoidingView, Platform, StyleSheet } from 'react-native';
 import { collection, addDoc, query, where, onSnapshot, serverTimestamp, getDocs } from 'firebase/firestore';
 import { db, auth } from '../firebaseConfig';
+import { Button as PaperButton } from 'react-native-paper';
 
 const ChatScreen = ({ route, navigation }) => {
   const otherUser = route?.params?.otherUser;
@@ -11,9 +11,8 @@ const ChatScreen = ({ route, navigation }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const currentUser = auth.currentUser;
-
-  // Function to fetch messages where the other user is the sender
-
+  const flatListRef = useRef(null);
+  const [isSending, setIsSending] = useState(false);
 
   useEffect(() => {
     if (!currentUser) {
@@ -28,90 +27,67 @@ const ChatScreen = ({ route, navigation }) => {
       return;
     }
 
-    console.log('Chat with user:', otherUser.id);
-    console.log('Current user ID:', currentUser.uid);
-    
     const initializeChat = async () => {
       try {
-        // Check for existing messages
         const messagesRef = collection(db, 'messages');
         
-        // Query for messages where the current user is the sender and the other user is the receiver
         const sentMessagesQuery = query(
           messagesRef,
           where('senderId', '==', currentUser.uid),
           where('receiverId', '==', otherUser.id)
         );
         
-        // Query for messages where the other user is the sender and the current user is the receiver
         const receivedMessagesQuery = query(
           messagesRef,
           where('senderId', '==', otherUser.id),
           where('receiverId', '==', currentUser.uid)
         );
         
-        console.log('Setting up real-time listeners for messages...');
-        
-        // Set up listeners for both sent and received messages
         const unsubscribeSent = onSnapshot(sentMessagesQuery, (snapshot) => {
-          console.log('Sent messages snapshot received, document count:', snapshot.size);
           const sentMessages = [];
           snapshot.forEach((doc) => {
-            const data = doc.data();
-            console.log('Sent message data:', { id: doc.id, ...data });
-            sentMessages.push({ id: doc.id, ...data });
+            sentMessages.push({ id: doc.id, ...doc.data() });
           });
           
-          // Update messages state with sent messages
           setMessages(prevMessages => {
-            // Filter out any existing sent messages
             const filteredMessages = prevMessages.filter(msg => 
-              !(msg.senderId === currentUser.uid && msg.receiverId === otherUser.id)
+              !(msg.senderId === currentUser.uid && msg.receiverId === otherUser.id && !msg.isPending)
             );
-            // Add new sent messages
-            return [...filteredMessages, ...sentMessages];
+            const updatedMessages = [...filteredMessages, ...sentMessages];
+            return updatedMessages.sort((a, b) => {
+              const timeA = a.timestamp?.toDate?.() || new Date(0);
+              const timeB = b.timestamp?.toDate?.() || new Date(0);
+              return timeA - timeB;
+            });
           });
-        }, (error) => {
-          console.error('Error in sent messages listener:', error);
         });
         
         const unsubscribeReceived = onSnapshot(receivedMessagesQuery, (snapshot) => {
-          console.log('Received messages snapshot received, document count:', snapshot.size);
           const receivedMessages = [];
           snapshot.forEach((doc) => {
-            const data = doc.data();
-            console.log('Received message data:', { id: doc.id, ...data });
-            receivedMessages.push({ id: doc.id, ...data });
+            receivedMessages.push({ id: doc.id, ...doc.data() });
           });
           
-          // Update messages state with received messages
           setMessages(prevMessages => {
-            // Filter out any existing received messages
             const filteredMessages = prevMessages.filter(msg => 
               !(msg.senderId === otherUser.id && msg.receiverId === currentUser.uid)
             );
-            // Add new received messages
-            return [...filteredMessages, ...receivedMessages];
+            const updatedMessages = [...filteredMessages, ...receivedMessages];
+            return updatedMessages.sort((a, b) => {
+              const timeA = a.timestamp?.toDate?.() || new Date(0);
+              const timeB = b.timestamp?.toDate?.() || new Date(0);
+              return timeA - timeB;
+            });
           });
           
-          // Set loading to false after receiving messages
-          setLoading(false);
-        }, (error) => {
-          console.error('Error in received messages listener:', error);
-          setError('Failed to load messages: ' + error.message);
           setLoading(false);
         });
         
-        // Also try to fetch all messages where the other user is the sender
-
-        
         return () => {
-          console.log('Cleaning up message listeners');
           unsubscribeSent();
           unsubscribeReceived();
         };
       } catch (error) {
-        console.error('Error initializing chat:', error);
         setError('Failed to initialize chat: ' + error.message);
         setLoading(false);
       }
@@ -120,20 +96,8 @@ const ChatScreen = ({ route, navigation }) => {
     initializeChat();
   }, [otherUser?.id, currentUser]);
 
-  // Sort messages by timestamp
-  useEffect(() => {
-    if (messages.length > 0) {
-      const sortedMessages = [...messages].sort((a, b) => {
-        const timeA = a.timestamp?.toDate?.() || new Date(0);
-        const timeB = b.timestamp?.toDate?.() || new Date(0);
-        return timeA - timeB;
-      });
-      setMessages(sortedMessages);
-    }
-  }, [messages.length]);
-
   const sendMessage = async () => {
-    if (newMessage.trim() === '') return;
+    if (newMessage.trim() === '' || isSending) return;
     
     if (!otherUser || !otherUser.id) {
       Alert.alert('Error', 'Cannot send message: Chat partner information is missing');
@@ -141,10 +105,32 @@ const ChatScreen = ({ route, navigation }) => {
     }
     
     try {
-      console.log('Sending message to user:', otherUser.id);
-      
+      setIsSending(true);
       const messagesRef = collection(db, 'messages');
       
+      // Add optimistic UI update - create a temporary message to show instantly
+      const tempMessage = {
+        id: 'temp-' + Date.now(),
+        senderId: currentUser.uid,
+        receiverId: otherUser.id,
+        content: newMessage,
+        timestamp: new Date(), // Use client date for sorting until server timestamp arrives
+        isPending: true
+      };
+      
+      // Add the temporary message to the state immediately
+      setMessages(prevMessages => {
+        return [...prevMessages, tempMessage].sort((a, b) => {
+          const timeA = a.timestamp?.toDate?.() || a.timestamp || new Date(0);
+          const timeB = b.timestamp?.toDate?.() || b.timestamp || new Date(0);
+          return timeA - timeB;
+        });
+      });
+      
+      // Clear the input field immediately for better UX
+      setNewMessage('');
+      
+      // Create the message data for Firebase
       const messageData = {
         senderId: currentUser.uid,
         receiverId: otherUser.id,
@@ -152,19 +138,29 @@ const ChatScreen = ({ route, navigation }) => {
         timestamp: serverTimestamp()
       };
       
-      const messageRef = await addDoc(messagesRef, messageData);
-      console.log('Message sent successfully with ID:', messageRef.id);
+      // Add the message to Firestore
+      await addDoc(messagesRef, messageData);
       
-      setNewMessage('');
+      // Scroll to bottom after the message is added
+      if (flatListRef.current) {
+        setTimeout(() => {
+          flatListRef.current?.scrollToEnd({ animated: false });
+        }, 100);
+      }
     } catch (error) {
-      console.error('Error sending message:', error);
+      // If an error occurs, remove the temporary message
+      setMessages(prevMessages => 
+        prevMessages.filter(msg => !msg.isPending)
+      );
       Alert.alert('Error', 'Failed to send message: ' + error.message);
+    } finally {
+      setIsSending(false);
     }
   };
 
   if (loading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+      <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" />
       </View>
     );
@@ -172,50 +168,146 @@ const ChatScreen = ({ route, navigation }) => {
 
   if (error) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
-        <Text style={{ fontSize: 18, marginBottom: 20, textAlign: 'center' }}>{error}</Text>
-        <Button title="Go Back" onPress={() => navigation.goBack()} />
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>{error}</Text>
+        <PaperButton 
+          mode="contained"
+          onPress={() => navigation.goBack()}
+          style={styles.backButton}
+        >
+          Go Back
+        </PaperButton>
       </View>
     );
   }
 
   return (
-    <View style={{ flex: 1 }}>
+    <KeyboardAvoidingView 
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={styles.container}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+    >
       <FlatList
+        ref={flatListRef}
         data={messages}
         keyExtractor={(item) => item.id}
+        style={styles.messageList}
+        onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
+        onLayout={() => flatListRef.current?.scrollToEnd({ animated: false })}
         renderItem={({ item }) => (
-          <View style={{ 
-            padding: 10, 
-            backgroundColor: item.isSystemMessage ? '#f0f0f0' : 
-                            (item.senderId === currentUser.uid ? '#e6f7ff' : '#f0f0f0'),
-            marginVertical: 5,
-            borderRadius: 10,
-            alignSelf: item.isSystemMessage ? 'center' : 
-                      (item.senderId === currentUser.uid ? 'flex-end' : 'flex-start'),
-            maxWidth: '70%'
-          }}>
-            <Text style={{ 
-              fontStyle: item.isSystemMessage ? 'italic' : 'normal',
-              color: item.isSystemMessage ? '#666' : '#000'
-            }}>
-              {item.content}
-            </Text>
+          <View style={[
+            styles.messageContainer,
+            item.senderId === currentUser.uid ? styles.sentMessage : styles.receivedMessage,
+            item.isPending && styles.pendingMessage
+          ]}>
+            <Text style={styles.messageText}>{item.content}</Text>
+            {item.isPending && (
+              <Text style={styles.pendingText}>Sending...</Text>
+            )}
           </View>
         )}
       />
       
-      <View style={{ flexDirection: 'row', padding: 10 }}>
+      <View style={styles.inputContainer}>
         <TextInput
-          style={{ flex: 1, borderWidth: 1, borderColor: '#ddd', borderRadius: 5, padding: 10 }}
+          style={styles.input}
           value={newMessage}
           onChangeText={setNewMessage}
           placeholder="Type a message..."
+          multiline
+          maxLength={500}
+          editable={!isSending}
         />
-        <Button title="Send" onPress={sendMessage} />
+        <PaperButton 
+          mode="contained"
+          onPress={sendMessage}
+          style={styles.sendButton}
+          disabled={!newMessage.trim() || isSending}
+          loading={isSending}
+        >
+          Send
+        </PaperButton>
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 };
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  errorText: {
+    fontSize: 18,
+    marginBottom: 20,
+    textAlign: 'center',
+    color: 'red',
+  },
+  backButton: {
+    marginTop: 10,
+  },
+  messageList: {
+    flex: 1,
+    padding: 10,
+  },
+  messageContainer: {
+    padding: 10,
+    marginVertical: 5,
+    borderRadius: 10,
+    maxWidth: '80%',
+  },
+  sentMessage: {
+    backgroundColor: '#e6f7ff',
+    alignSelf: 'flex-end',
+  },
+  receivedMessage: {
+    backgroundColor: '#f0f0f0',
+    alignSelf: 'flex-start',
+  },
+  pendingMessage: {
+    opacity: 0.7,
+  },
+  pendingText: {
+    fontSize: 10,
+    color: '#888',
+    alignSelf: 'flex-end',
+    marginTop: 2,
+  },
+  messageText: {
+    fontSize: 16,
+    color: '#000',
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    padding: 10,
+    backgroundColor: '#fff',
+    borderTopWidth: 1,
+    borderTopColor: '#ddd',
+    alignItems: 'center',
+  },
+  input: {
+    flex: 1,
+    backgroundColor: '#f8f8f8',
+    borderRadius: 20,
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    marginRight: 10,
+    maxHeight: 100,
+  },
+  sendButton: {
+    borderRadius: 20,
+  },
+});
 
 export default ChatScreen;
