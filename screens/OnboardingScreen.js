@@ -5,7 +5,6 @@ import { TextInput, Button, Text } from 'react-native-paper';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { auth, db } from '../firebaseConfig';
-import { testFirestore } from '../firebaseTest';
 
 const OnboardingScreen = ({ navigation }) => {
   const [isSignUp, setIsSignUp] = useState(true);
