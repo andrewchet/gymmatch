@@ -1,151 +1,142 @@
 // screens/QuestionnaireScreen.js
 import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, Image, TouchableOpacity, Alert } from 'react-native';
+import { View, StyleSheet, Alert, ScrollView, Image } from 'react-native';
 import { TextInput, Button, Text } from 'react-native-paper';
+import { doc, updateDoc } from 'firebase/firestore';
+import { auth, db } from '../firebaseConfig';
 import * as ImagePicker from 'expo-image-picker';
-import { db, auth } from '../firebaseConfig';
-import { doc, setDoc } from 'firebase/firestore';
-
-const fitnessGoals = [
-  'Build muscle', 'Lose weight', 'Gain endurance', 'Get toned',
-  'Improve flexibility', 'Train for competition', 'Feel healthier',
-  'Boost energy', 'Fix posture', 'Workout with friends'
-];
-
-const hobbiesList = [
-  'Hiking', 'Biking', 'Swimming', 'Running', 'Climbing',
-  'Dancing', 'Weightlifting', 'Yoga', 'Boxing', 'Rowing'
-];
 
 const QuestionnaireScreen = ({ navigation }) => {
-  const [photos, setPhotos] = useState([]);
-  const [form, setForm] = useState({
-    name: '',
-    age: '',
-    goals: '',
-    hobbies: '',
-    location: '',
-  });
+  const [name, setName] = useState('');
+  const [age, setAge] = useState('');
+  const [university, setUniversity] = useState('');
+  const [bio, setBio] = useState('');
+  const [profilePicture, setProfilePicture] = useState(null);
 
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
-      allowsMultipleSelection: true,
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 1,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.5,
     });
+
     if (!result.canceled) {
-      setPhotos(prev => [...prev, result.assets[0].uri].slice(0, 4));
+      setProfilePicture(result.assets[0].uri);
     }
   };
 
   const handleSubmit = async () => {
     try {
       const user = auth.currentUser;
-      if (!user) throw new Error("User not authenticated");
+      if (!user) {
+        Alert.alert('Error', 'No user logged in');
+        return;
+      }
 
-      await setDoc(doc(db, "profiles", user.uid), {
-        ...form,
-        photos,
-        uid: user.uid,
-        timestamp: new Date().toISOString(),
+      const profileRef = doc(db, 'profiles', user.uid);
+      await updateDoc(profileRef, {
+        name,
+        age: parseInt(age),
+        university,
+        bio,
+        profilePicture,
+        updatedAt: new Date().toISOString(),
       });
 
-      Alert.alert("Success", "Profile saved!");
-      navigation.navigate('Browse');
+      navigation.replace('Home');
     } catch (error) {
-      console.error("Error saving profile: ", error);
-      Alert.alert("Error", error.message);
+      console.error('Error updating profile:', error);
+      Alert.alert('Error', 'Failed to update profile');
     }
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text variant="titleLarge">Create Your Profile</Text>
-      
-      <View style={styles.photoContainer}>
-        {photos.map((uri, idx) => (
-          <Image key={idx} source={{ uri }} style={styles.photo} />
-        ))}
-        {photos.length < 4 && (
-          <TouchableOpacity onPress={pickImage} style={styles.uploadBox}>
-            <Text>+</Text>
-          </TouchableOpacity>
-        )}
-      </View>
+    <ScrollView style={styles.container}>
+      <Text variant="titleLarge" style={styles.title}>Complete Your Profile</Text>
+
+      <Button 
+        mode="outlined" 
+        onPress={pickImage} 
+        style={styles.imageButton}
+      >
+        {profilePicture ? 'Change Profile Picture' : 'Add Profile Picture'}
+      </Button>
+
+      {profilePicture && (
+        <Image 
+          source={{ uri: profilePicture }} 
+          style={styles.profileImage} 
+        />
+      )}
 
       <TextInput
-        label="Name"
-        value={form.name}
-        onChangeText={text => setForm({ ...form, name: text })}
+        label="Full Name"
+        value={name}
+        onChangeText={setName}
         style={styles.input}
       />
+
       <TextInput
         label="Age"
-        value={form.age}
+        value={age}
+        onChangeText={setAge}
+        style={styles.input}
         keyboardType="numeric"
-        onChangeText={text => setForm({ ...form, age: text })}
-        style={styles.input}
       />
+
       <TextInput
-        label="Location"
-        value={form.location}
-        onChangeText={text => setForm({ ...form, location: text })}
-        style={styles.input}
-      />
-      <TextInput
-        label="Fitness Goal"
-        value={form.goals}
-        onFocus={() =>
-          setForm({ ...form, goals: fitnessGoals[Math.floor(Math.random() * fitnessGoals.length)] })
-        }
-        style={styles.input}
-      />
-      <TextInput
-        label="Hobby"
-        value={form.hobbies}
-        onFocus={() =>
-          setForm({ ...form, hobbies: hobbiesList[Math.floor(Math.random() * hobbiesList.length)] })
-        }
+        label="University"
+        value={university}
+        onChangeText={setUniversity}
         style={styles.input}
       />
 
-      <Button mode="contained" onPress={handleSubmit} style={styles.button}>
-        Save Profile
+      <TextInput
+        label="Bio"
+        value={bio}
+        onChangeText={setBio}
+        style={styles.input}
+        multiline
+        numberOfLines={4}
+      />
+
+      <Button 
+        mode="contained" 
+        onPress={handleSubmit} 
+        style={styles.button}
+      >
+        Complete Profile
       </Button>
     </ScrollView>
   );
 };
 
-export default QuestionnaireScreen;
-
 const styles = StyleSheet.create({
   container: {
+    flex: 1,
     padding: 20,
-    paddingBottom: 50,
+  },
+  title: {
+    textAlign: 'center',
+    marginBottom: 30,
   },
   input: {
     marginBottom: 15,
   },
-  photoContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+  button: {
     marginVertical: 10,
   },
-  photo: {
-    width: 70,
-    height: 70,
-    marginRight: 10,
-    borderRadius: 10,
+  imageButton: {
+    marginBottom: 15,
   },
-  uploadBox: {
-    width: 70,
-    height: 70,
-    borderRadius: 10,
-    backgroundColor: '#eee',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  button: {
-    marginTop: 20,
+  profileImage: {
+    width: 150,
+    height: 150,
+    borderRadius: 75,
+    alignSelf: 'center',
+    marginBottom: 20,
   },
 });
+
+export default QuestionnaireScreen;

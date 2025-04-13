@@ -1,31 +1,94 @@
 // OnboardingScreen.js
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, Alert } from 'react-native';
 import { TextInput, Button, Text } from 'react-native-paper';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '../firebaseConfig';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { auth, db } from '../firebaseConfig';
+import { testFirestore } from '../firebaseTest';
 
 const OnboardingScreen = ({ navigation }) => {
   const [isSignUp, setIsSignUp] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [firestoreWorking, setFirestoreWorking] = useState(null);
+
+  useEffect(() => {
+    // Test Firestore connection when component mounts
+    const checkFirestore = async () => {
+      const result = await testFirestore();
+      setFirestoreWorking(result);
+      console.log('Firestore test result:', result);
+    };
+    
+    checkFirestore();
+  }, []);
 
   const handleAuth = async () => {
     try {
       if (isSignUp) {
-        await createUserWithEmailAndPassword(auth, email, password);
+        console.log('Starting signup process...');
+        
+        // Create the authentication account
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        const user = userCredential.user;
+        console.log('User created with UID:', user.uid);
+
+        try {
+          // Create initial empty profile
+          console.log('Attempting to create profile document...');
+          const profileRef = doc(db, 'profiles', user.uid);
+          console.log('Profile reference created:', profileRef.path);
+          
+          const profileData = {
+            email: email,
+            createdAt: new Date().toISOString(),
+          };
+          console.log('Profile data to be set:', profileData);
+          
+          await setDoc(profileRef, profileData);
+          console.log('Profile document created successfully');
+          
+          // Verify the document was created
+          const verifyRef = doc(db, 'profiles', user.uid);
+          const verifySnap = await getDoc(verifyRef);
+          console.log('Verification result:', verifySnap.exists() ? 'Document exists' : 'Document does not exist');
+          
+        } catch (profileError) {
+          console.error('Error creating profile:', profileError);
+          console.error('Error details:', JSON.stringify(profileError));
+          // If profile creation fails, we should delete the auth user
+          await user.delete();
+          throw new Error('Failed to create profile. Please try again.');
+        }
       } else {
         await signInWithEmailAndPassword(auth, email, password);
       }
       navigation.replace('Questionnaire');
     } catch (error) {
-      Alert.alert('Authentication Error', error.message);
+      console.error('Auth Error:', error.code, error.message);
+      let errorMessage = 'Authentication Error';
+      
+      if (error.code === 'auth/email-already-in-use') {
+        errorMessage = 'This email is already registered. Please try logging in instead.';
+      } else if (error.code === 'auth/invalid-email') {
+        errorMessage = 'Please enter a valid email address.';
+      } else if (error.code === 'auth/weak-password') {
+        errorMessage = 'Password should be at least 6 characters.';
+      }
+      
+      Alert.alert('Error', errorMessage);
     }
   };
 
   return (
     <View style={styles.container}>
       <Text variant="titleLarge" style={styles.title}>{isSignUp ? 'Sign Up' : 'Log In'}</Text>
+      
+      {firestoreWorking === false && (
+        <Text style={styles.errorText}>Warning: Database connection issue detected</Text>
+      )}
+      
       <TextInput
         label="Email"
         value={email}
@@ -41,6 +104,7 @@ const OnboardingScreen = ({ navigation }) => {
         style={styles.input}
         secureTextEntry
       />
+
       <Button mode="contained" onPress={handleAuth} style={styles.button}>
         {isSignUp ? 'Sign Up' : 'Log In'}
       </Button>
@@ -50,8 +114,6 @@ const OnboardingScreen = ({ navigation }) => {
     </View>
   );
 };
-
-export default OnboardingScreen;
 
 const styles = StyleSheet.create({
   container: {
@@ -72,4 +134,11 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 30,
   },
+  errorText: {
+    color: 'red',
+    textAlign: 'center',
+    marginBottom: 15,
+  },
 });
+
+export default OnboardingScreen;

@@ -1,6 +1,7 @@
 // firebaseConfig.js
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
+import { getFirestore } from 'firebase/firestore';
 
 const firebaseConfig = {
   apiKey: 'AIzaSyC2Ni-OI8MEp3yjuH0tWX6dt7xPTVxZ8ro',
@@ -12,7 +13,13 @@ const firebaseConfig = {
   measurementId: 'G-F6ESNHYV6R',
 };
 
+// Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
+const db = getFirestore(app);
 
-export { auth };
+// Log initialization
+console.log('Firebase initialized with project ID:', firebaseConfig.projectId);
+console.log('Firestore instance created:', db ? 'Yes' : 'No');
+
+export { auth, db };
