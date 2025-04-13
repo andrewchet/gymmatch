@@ -14,55 +14,76 @@ const ChatListScreen = ({ navigation }) => {
         const currentUser = auth.currentUser;
         if (!currentUser) {
           console.error('No user logged in');
+          Alert.alert('Error', 'You must be logged in to view matches');
+          setLoading(false);
           return;
         }
 
         console.log('Fetching matches for user:', currentUser.uid);
 
-        // Query for matches where the current user is involved and status is 'matched'
+        // Query for matches where the current user is involved
         const matchesCollection = collection(db, 'matches');
-        const matchesQuery = query(
-          matchesCollection,
-          where('status', '==', 'matched')
-        );
-
-        const matchesSnapshot = await getDocs(matchesQuery);
-        console.log('Found matches count:', matchesSnapshot.size);
-
-        const matchPromises = matchesSnapshot.docs.map(async (matchDoc) => {
-          const matchData = matchDoc.data();
-          console.log('Processing match:', matchData);
-          
-          // Check if this match involves the current user
-          if (!matchData.users.includes(currentUser.uid)) {
-            console.log('Match does not involve current user, skipping');
-            return null;
-          }
-          
+        
+        // First, try to get all matches and filter in memory
+        // This is a fallback approach if the security rules are causing issues
+        const matchesSnapshot = await getDocs(matchesCollection);
+        console.log('Total matches found:', matchesSnapshot.size);
+        
+        // Filter matches that involve the current user and have status 'matched'
+        const userMatches = matchesSnapshot.docs
+          .filter(doc => {
+            const data = doc.data();
+            return data.users && 
+                   data.users.includes(currentUser.uid) && 
+                   data.status === 'matched';
+          })
+          .map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }));
+        
+        console.log('User matches after filtering:', userMatches.length);
+        
+        // Fetch profiles for each match
+        const matchPromises = userMatches.map(async (matchData) => {
           // Get the other user's ID (the one that's not the current user)
           const otherUserId = matchData.users.find(id => id !== currentUser.uid);
           console.log('Other user ID:', otherUserId);
           
-          // Fetch the other user's profile
-          const profileDoc = await getDoc(doc(db, 'profiles', otherUserId));
-          if (!profileDoc.exists()) {
-            console.error('Profile not found for user:', otherUserId);
+          if (!otherUserId) {
+            console.error('Could not find other user ID in match:', matchData);
             return null;
           }
           
-          const profileData = profileDoc.data();
-          console.log('Profile data:', profileData);
-          
-          return {
-            id: matchDoc.id,
-            matchTimestamp: matchData.timestamp,
-            lastUpdated: matchData.lastUpdated,
-            ...profileData
-          };
+          // Fetch the other user's profile
+          try {
+            const profileDoc = await getDoc(doc(db, 'profiles', otherUserId));
+            if (!profileDoc.exists()) {
+              console.error('Profile not found for user:', otherUserId);
+              return null;
+            }
+            
+            const profileData = profileDoc.data();
+            console.log('Profile data for user:', otherUserId);
+            
+            return {
+              id: matchData.id,
+              matchTimestamp: matchData.timestamp,
+              lastUpdated: matchData.lastUpdated,
+              ...profileData
+            };
+          } catch (profileError) {
+            console.error('Error fetching profile for user:', otherUserId, profileError);
+            return null;
+          }
         });
 
         const matchesWithProfiles = (await Promise.all(matchPromises)).filter(match => match !== null);
-        console.log('Final matches with profiles:', matchesWithProfiles);
+        console.log('Final matches with profiles:', matchesWithProfiles.length);
+        
+        if (matchesWithProfiles.length === 0) {
+          console.log('No matches found for user');
+        }
         
         // Sort matches by last updated time (most recent first)
         const sortedMatches = matchesWithProfiles.sort((a, b) => {
@@ -99,7 +120,7 @@ const ChatListScreen = ({ navigation }) => {
         renderItem={({ item }) => (
           <TouchableOpacity 
             style={styles.matchItem}
-            onPress={() => navigation.navigate('Chat', { user: item })}
+            onPress={() => navigation.navigate('Chat', { otherUser: item })}
           >
             <Avatar.Image 
               size={50} 
