@@ -1,7 +1,7 @@
 // In your ChatScreen.js
 import React, { useState, useEffect } from 'react';
 import { View, Text, FlatList, TextInput, Button, ActivityIndicator, Alert } from 'react-native';
-import { collection, addDoc, query, where, onSnapshot, doc, getDoc, setDoc, getDocs, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, query, where, onSnapshot, serverTimestamp, getDocs } from 'firebase/firestore';
 import { db, auth } from '../firebaseConfig';
 
 const ChatScreen = ({ route, navigation }) => {
@@ -10,8 +10,49 @@ const ChatScreen = ({ route, navigation }) => {
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [chatId, setChatId] = useState(null);
   const currentUser = auth.currentUser;
+
+  // Function to fetch messages where the other user is the sender
+  const fetchOtherUserMessages = async () => {
+    try {
+      console.log('Fetching messages where other user is sender:', otherUser.id);
+      const messagesRef = collection(db, 'messages');
+      
+      // Query for all messages where the other user is the sender
+      const otherUserMessagesQuery = query(
+        messagesRef,
+        where('senderId', '==', otherUser.id)
+      );
+      
+      const snapshot = await getDocs(otherUserMessagesQuery);
+      console.log('Found messages where other user is sender, count:', snapshot.size);
+      
+      const otherUserMessages = [];
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        // Check if the current user is the receiver or if the receiverId contains the current user's ID
+        if (data.receiverId === currentUser.uid || 
+            (typeof data.receiverId === 'string' && data.receiverId.includes(currentUser.uid))) {
+          console.log('Other user message:', { id: doc.id, ...data });
+          otherUserMessages.push({ id: doc.id, ...data });
+        }
+      });
+      
+      console.log('Other user messages count:', otherUserMessages.length);
+      
+      // Update messages state with other user messages
+      setMessages(prevMessages => {
+        // Filter out any existing messages from the other user
+        const filteredMessages = prevMessages.filter(msg => 
+          !(msg.senderId === otherUser.id)
+        );
+        // Add new messages from the other user
+        return [...filteredMessages, ...otherUserMessages];
+      });
+    } catch (error) {
+      console.error('Error fetching other user messages:', error);
+    }
+  };
 
   useEffect(() => {
     if (!currentUser) {
@@ -27,72 +68,86 @@ const ChatScreen = ({ route, navigation }) => {
     }
 
     console.log('Chat with user:', otherUser.id);
-    
-    // Create a unique chat ID for the two users
-    const uniqueChatId = [currentUser.uid, otherUser.id].sort().join('_');
-    setChatId(uniqueChatId);
-    console.log('Chat ID:', uniqueChatId);
+    console.log('Current user ID:', currentUser.uid);
     
     const initializeChat = async () => {
       try {
         // Check for existing messages
         const messagesRef = collection(db, 'messages');
         
-        // Use a simple query that doesn't require a composite index
-        const messagesQuery = query(
+        // Query for messages where the current user is the sender and the other user is the receiver
+        const sentMessagesQuery = query(
           messagesRef,
-          where('chatId', '==', uniqueChatId)
+          where('senderId', '==', currentUser.uid),
+          where('receiverId', '==', otherUser.id)
         );
         
-        console.log('Setting up real-time listener for messages...');
-        const unsubscribe = onSnapshot(messagesQuery, (snapshot) => {
-          console.log('Snapshot received, document count:', snapshot.size);
-          const messageList = [];
+        // Query for messages where the other user is the sender and the current user is the receiver
+        const receivedMessagesQuery = query(
+          messagesRef,
+          where('senderId', '==', otherUser.id),
+          where('receiverId', '==', currentUser.uid)
+        );
+        
+        console.log('Setting up real-time listeners for messages...');
+        
+        // Set up listeners for both sent and received messages
+        const unsubscribeSent = onSnapshot(sentMessagesQuery, (snapshot) => {
+          console.log('Sent messages snapshot received, document count:', snapshot.size);
+          const sentMessages = [];
           snapshot.forEach((doc) => {
             const data = doc.data();
-            console.log('Message data:', { 
-              id: doc.id, 
-              ...data,
-              isFromCurrentUser: data.senderId === currentUser.uid
-            });
-            messageList.push({ id: doc.id, ...data });
+            console.log('Sent message data:', { id: doc.id, ...data });
+            sentMessages.push({ id: doc.id, ...data });
           });
           
-          // Sort messages by timestamp manually
-          messageList.sort((a, b) => {
-            const timeA = a.timestamp?.toDate?.() || new Date(0);
-            const timeB = b.timestamp?.toDate?.() || new Date(0);
-            return timeA - timeB;
+          // Update messages state with sent messages
+          setMessages(prevMessages => {
+            // Filter out any existing sent messages
+            const filteredMessages = prevMessages.filter(msg => 
+              !(msg.senderId === currentUser.uid && msg.receiverId === otherUser.id)
+            );
+            // Add new sent messages
+            return [...filteredMessages, ...sentMessages];
+          });
+        }, (error) => {
+          console.error('Error in sent messages listener:', error);
+        });
+        
+        const unsubscribeReceived = onSnapshot(receivedMessagesQuery, (snapshot) => {
+          console.log('Received messages snapshot received, document count:', snapshot.size);
+          const receivedMessages = [];
+          snapshot.forEach((doc) => {
+            const data = doc.data();
+            console.log('Received message data:', { id: doc.id, ...data });
+            receivedMessages.push({ id: doc.id, ...data });
           });
           
-          console.log('Setting messages state with count:', messageList.length);
-          setMessages(messageList);
+          // Update messages state with received messages
+          setMessages(prevMessages => {
+            // Filter out any existing received messages
+            const filteredMessages = prevMessages.filter(msg => 
+              !(msg.senderId === otherUser.id && msg.receiverId === currentUser.uid)
+            );
+            // Add new received messages
+            return [...filteredMessages, ...receivedMessages];
+          });
+          
+          // Set loading to false after receiving messages
           setLoading(false);
         }, (error) => {
-          console.error('Error in real-time listener:', error);
-          console.error('Error code:', error.code);
-          console.error('Error message:', error.message);
+          console.error('Error in received messages listener:', error);
           setError('Failed to load messages: ' + error.message);
           setLoading(false);
         });
         
-        // If no messages exist, create an initial system message
-        const initialSnapshot = await getDocs(messagesQuery);
-        
-        if (initialSnapshot.empty) {
-          console.log('No existing messages found, creating initial message');
-          await addDoc(messagesRef, {
-            chatId: uniqueChatId,
-            senderId: 'system',
-            content: 'Chat started',
-            timestamp: serverTimestamp(),
-            isSystemMessage: true
-          });
-        }
+        // Also try to fetch all messages where the other user is the sender
+        await fetchOtherUserMessages();
         
         return () => {
-          console.log('Cleaning up message listener');
-          unsubscribe();
+          console.log('Cleaning up message listeners');
+          unsubscribeSent();
+          unsubscribeReceived();
         };
       } catch (error) {
         console.error('Error initializing chat:', error);
@@ -103,6 +158,18 @@ const ChatScreen = ({ route, navigation }) => {
     
     initializeChat();
   }, [otherUser?.id, currentUser]);
+
+  // Sort messages by timestamp
+  useEffect(() => {
+    if (messages.length > 0) {
+      const sortedMessages = [...messages].sort((a, b) => {
+        const timeA = a.timestamp?.toDate?.() || new Date(0);
+        const timeB = b.timestamp?.toDate?.() || new Date(0);
+        return timeA - timeB;
+      });
+      setMessages(sortedMessages);
+    }
+  }, [messages.length]);
 
   const sendMessage = async () => {
     if (newMessage.trim() === '') return;
@@ -116,8 +183,8 @@ const ChatScreen = ({ route, navigation }) => {
       console.log('Sending message to user:', otherUser.id);
       
       const messagesRef = collection(db, 'messages');
+      
       const messageData = {
-        chatId,
         senderId: currentUser.uid,
         receiverId: otherUser.id,
         content: newMessage,
