@@ -1,8 +1,8 @@
 // screens/QuestionnaireScreen.js
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, Alert, ScrollView } from 'react-native';
 import { TextInput, Button, Text } from 'react-native-paper';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc, getDoc } from 'firebase/firestore';
 import { auth, db } from '../firebaseConfig';
 
 const QuestionnaireScreen = ({ navigation }) => {
@@ -10,6 +10,39 @@ const QuestionnaireScreen = ({ navigation }) => {
   const [age, setAge] = useState('');
   const [university, setUniversity] = useState('');
   const [bio, setBio] = useState('');
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const checkExistingProfile = async () => {
+      try {
+        const user = auth.currentUser;
+        if (!user) {
+          Alert.alert('Error', 'No user logged in');
+          return;
+        }
+
+        const profileRef = doc(db, 'profiles', user.uid);
+        const profileDoc = await getDoc(profileRef);
+
+        if (profileDoc.exists()) {
+          const profileData = profileDoc.data();
+          // Check if the profile has the required fields
+          if (profileData.name && profileData.age && profileData.university && profileData.bio) {
+            console.log('Existing profile found, skipping questionnaire');
+            navigation.replace('Home');
+            return;
+          }
+        }
+
+        setLoading(false);
+      } catch (error) {
+        console.error('Error checking profile:', error);
+        setLoading(false);
+      }
+    };
+
+    checkExistingProfile();
+  }, [navigation]);
 
   const handleSubmit = async () => {
     try {
@@ -34,6 +67,14 @@ const QuestionnaireScreen = ({ navigation }) => {
       Alert.alert('Error', 'Failed to update profile');
     }
   };
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Text>Loading...</Text>
+      </View>
+    );
+  }
 
   return (
     <ScrollView style={styles.container}>
@@ -95,6 +136,11 @@ const styles = StyleSheet.create({
   },
   button: {
     marginVertical: 10,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 
