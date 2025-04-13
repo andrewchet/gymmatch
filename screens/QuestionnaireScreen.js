@@ -1,7 +1,7 @@
 // screens/QuestionnaireScreen.js
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, StyleSheet, Alert, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
-import { TextInput, Button, Text, Chip, Checkbox, IconButton } from 'react-native-paper';
+import { TextInput, Button, Text, Chip, Checkbox } from 'react-native-paper';
 import { doc, updateDoc, getDoc } from 'firebase/firestore';
 import { auth, db } from '../firebaseConfig';
 
@@ -77,7 +77,7 @@ const QuestionnaireScreen = ({ navigation, route }) => {
     checkExistingProfile();
   }, [navigation, isEditMode]);
 
-  const handleSubmit = async () => {
+  const handleSubmit = useCallback(async () => {
     try {
       const user = auth.currentUser;
       if (!user) {
@@ -110,7 +110,14 @@ const QuestionnaireScreen = ({ navigation, route }) => {
       console.error('Error updating profile:', error);
       Alert.alert('Error', 'Failed to update profile');
     }
-  };
+  }, [name, age, major, selectedSports, selectedAvailability, selectedLiftingExpertise, goals, funFact, navigation]);
+
+  // Expose handleSubmit to navigation params for the header button
+  useEffect(() => {
+    if (isEditMode) {
+      navigation.setParams({ handleSubmit });
+    }
+  }, [navigation, isEditMode, handleSubmit]);
 
   // Toggle selection for multiple choice fields
   const toggleSelection = (item, selectedItems, setSelectedItems) => {
@@ -140,18 +147,6 @@ const QuestionnaireScreen = ({ navigation, route }) => {
       style={styles.container}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0}
     >
-      {isEditMode && (
-        <View style={styles.topSaveButtonContainer}>
-          <IconButton
-            icon="check"
-            size={28}
-            mode="contained"
-            onPress={handleSubmit}
-            style={styles.topSaveButton}
-          />
-        </View>
-      )}
-      
       <ScrollView 
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
@@ -311,15 +306,6 @@ const styles = StyleSheet.create({
   },
   chip: {
     margin: 5,
-  },
-  topSaveButtonContainer: {
-    position: 'absolute',
-    top: 10,
-    right: 10,
-    zIndex: 10,
-  },
-  topSaveButton: {
-    backgroundColor: '#4CAF50',
   },
 });
 

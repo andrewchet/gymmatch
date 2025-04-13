@@ -46,10 +46,25 @@ const AppNavigator = () => {
       <Stack.Screen 
         name="Questionnaire" 
         component={QuestionnaireScreen}
-        options={{ 
-          title: 'Complete Profile',
+        options={({ route, navigation }) => ({ 
+          title: route.params?.editMode ? 'Edit Profile' : 'Complete Profile',
           headerLeft: null, // Disable back button for questionnaire
-        }}
+          headerRight: route.params?.editMode ? () => (
+            <IconButton
+              icon="check"
+              size={24}
+              onPress={() => {
+                // Find the QuestionnaireScreen component and call its handleSubmit method
+                const questionnaireScreen = navigation.getState().routes.find(
+                  route => route.name === 'Questionnaire'
+                );
+                if (questionnaireScreen && questionnaireScreen.params?.handleSubmit) {
+                  questionnaireScreen.params.handleSubmit();
+                }
+              }}
+            />
+          ) : null,
+        })}
       />
       <Stack.Screen 
         name="MainApp" 
