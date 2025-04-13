@@ -1,77 +1,84 @@
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, ScrollView, Image, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
-import { Card, Text, IconButton, Menu, Button } from 'react-native-paper';
+import { Card, Text, IconButton, Menu, Button, Chip } from 'react-native-paper';
 import { collection, getDocs, query, where, doc, setDoc, getDoc, addDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
 import { auth } from '../firebaseConfig';
+import { GoogleGenAI } from "@google/genai";
+
+// Initialize Gemini API for future use
+const ai = new GoogleGenAI({ apiKey: "AIzaSyCWs1F15R8lJBMrRLBSGW35pwQcTZRBuqQ" });
 
 const BrowseScreen = () => {
   const [index, setIndex] = useState(0);
   const [profiles, setProfiles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [ageMenuVisible, setAgeMenuVisible] = useState(false);
-  const [goalMenuVisible, setGoalMenuVisible] = useState(false);
-  const [locationMenuVisible, setLocationMenuVisible] = useState(false);
+  const [sportMenuVisible, setSportMenuVisible] = useState(false);
+  const [availabilityMenuVisible, setAvailabilityMenuVisible] = useState(false);
+  const [majorMenuVisible, setMajorMenuVisible] = useState(false);
 
-  useEffect(() => {
-    const fetchProfiles = async () => {
-      try {
-        const currentUser = auth.currentUser;
-        console.log('Current user:', currentUser?.uid);
-        
-        if (!currentUser) {
-          console.error('No user logged in');
-          Alert.alert('Error', 'You must be logged in to browse profiles');
-          setLoading(false);
-          return;
-        }
-        
-        // First, check if current user's profile exists
-        const currentUserProfileRef = doc(db, 'profiles', currentUser.uid);
-        const currentUserProfile = await getDoc(currentUserProfileRef);
-        
-        if (!currentUserProfile.exists()) {
-          console.error('Current user profile not found');
-          Alert.alert('Error', 'Your profile not found. Please complete your profile first.');
-          setLoading(false);
-          return;
-        }
-        
-        console.log('Current user profile:', currentUserProfile.data());
-        
-        // Then fetch all other profiles
-        const profilesCollection = collection(db, 'profiles');
-        
-        // Get all profiles first
-        const profilesSnapshot = await getDocs(profilesCollection);
-        console.log('Total profiles found:', profilesSnapshot.size);
-        
-        // Filter out the current user's profile
-        const profilesList = profilesSnapshot.docs
-          .filter(doc => doc.id !== currentUser.uid)
-          .map(doc => ({
-            id: doc.id,
-            uid: doc.id, // Set uid to the document ID
-            ...doc.data()
-          }));
-        
-        console.log('Fetched profiles count:', profilesList.length);
-        console.log('Fetched profiles:', profilesList);
-        
-        if (profilesList.length === 0) {
-          console.log('No other profiles found');
-          Alert.alert('Info', 'No other profiles available yet. Check back later!');
-        }
-        
-        setProfiles(profilesList);
-      } catch (error) {
-        console.error('Error fetching profiles:', error);
-        Alert.alert('Error', 'Failed to fetch profiles: ' + error.message);
-      } finally {
+  // Fetch profiles
+  const fetchProfiles = async () => {
+    try {
+      const currentUser = auth.currentUser;
+      console.log('Current user:', currentUser?.uid);
+      
+      if (!currentUser) {
+        console.error('No user logged in');
+        Alert.alert('Error', 'You must be logged in to browse profiles');
         setLoading(false);
+        return;
       }
-    };
+      
+      // First, check if current user's profile exists
+      const currentUserProfileRef = doc(db, 'profiles', currentUser.uid);
+      const currentUserProfile = await getDoc(currentUserProfileRef);
+      
+      if (!currentUserProfile.exists()) {
+        console.error('Current user profile not found');
+        Alert.alert('Error', 'Your profile not found. Please complete your profile first.');
+        setLoading(false);
+        return;
+      }
+      
+      console.log('Current user profile:', currentUserProfile.data());
+      
+      // Then fetch all other profiles
+      const profilesCollection = collection(db, 'profiles');
+      
+      // Get all profiles first
+      const profilesSnapshot = await getDocs(profilesCollection);
+      console.log('Total profiles found:', profilesSnapshot.size);
+      
+      // Filter out the current user's profile
+      const profilesList = profilesSnapshot.docs
+        .filter(doc => doc.id !== currentUser.uid)
+        .map(doc => ({
+          id: doc.id,
+          uid: doc.id, // Set uid to the document ID
+          ...doc.data()
+        }));
 
+      console.log('Fetched profiles count:', profilesList.length);
+      console.log('Fetched profiles:', profilesList);
+      
+      if (profilesList.length === 0) {
+        console.log('No other profiles found');
+        Alert.alert('Info', 'No other profiles available yet. Check back later!');
+      }
+      
+      setProfiles(profilesList);
+    } catch (error) {
+      console.error('Error fetching profiles:', error);
+      Alert.alert('Error', 'Failed to fetch profiles: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Load profiles when component mounts
+  useEffect(() => {
     fetchProfiles();
   }, []);
 
@@ -195,28 +202,48 @@ const BrowseScreen = () => {
           <Menu.Item title="36+" />
         </Menu>
         <Menu
-          visible={goalMenuVisible}
-          onDismiss={() => setGoalMenuVisible(false)}
-          anchor={<Button onPress={() => setGoalMenuVisible(true)}>Goal</Button>}
+          visible={sportMenuVisible}
+          onDismiss={() => setSportMenuVisible(false)}
+          anchor={<Button onPress={() => setSportMenuVisible(true)}>Sport</Button>}
         >
-          <Menu.Item title="Build Muscle" />
-          <Menu.Item title="Lose Weight" />
-          <Menu.Item title="Improve Endurance" />
+          <Menu.Item title="Running" />
+          <Menu.Item title="Swimming" />
+          <Menu.Item title="Cycling" />
+          <Menu.Item title="Basketball" />
+          <Menu.Item title="Soccer" />
+          <Menu.Item title="Tennis" />
+          <Menu.Item title="Yoga" />
+          <Menu.Item title="CrossFit" />
         </Menu>
         <Menu
-          visible={locationMenuVisible}
-          onDismiss={() => setLocationMenuVisible(false)}
-          anchor={<Button onPress={() => setLocationMenuVisible(true)}>Location</Button>}
+          visible={availabilityMenuVisible}
+          onDismiss={() => setAvailabilityMenuVisible(false)}
+          anchor={<Button onPress={() => setAvailabilityMenuVisible(true)}>Availability</Button>}
         >
-          <Menu.Item title="NYC" />
-          <Menu.Item title="LA" />
-          <Menu.Item title="Remote" />
+          <Menu.Item title="Morning" />
+          <Menu.Item title="Afternoon" />
+          <Menu.Item title="Evening" />
+          <Menu.Item title="Weekends" />
+          <Menu.Item title="Flexible" />
+        </Menu>
+        <Menu
+          visible={majorMenuVisible}
+          onDismiss={() => setMajorMenuVisible(false)}
+          anchor={<Button onPress={() => setMajorMenuVisible(true)}>Major</Button>}
+        >
+          <Menu.Item title="Computer Science" />
+          <Menu.Item title="Engineering" />
+          <Menu.Item title="Business" />
+          <Menu.Item title="Biology" />
+          <Menu.Item title="Psychology" />
+          <Menu.Item title="Other" />
         </Menu>
       </View>
 
       <Card style={styles.card}>
         <Card.Content>
-          <Text variant="titleLarge" style={styles.name}>{profile.name}</Text>
+          <Text variant="titleLarge" style={styles.name}>{profile.name}, {profile.age}</Text>
+          <Text style={styles.major}>{profile.major}</Text>
         </Card.Content>
         <ScrollView horizontal pagingEnabled>
           {profile.images?.map((uri, i) => (
@@ -226,11 +253,32 @@ const BrowseScreen = () => {
           ))}
         </ScrollView>
         <Card.Content>
-          {profile.prompts?.map((p, i) => (
-            <View key={i} style={styles.promptRow}>
-              <Text style={styles.prompt}>"{p}"</Text>
-            </View>
-          ))}
+          <Text style={styles.sectionTitle}>Sports</Text>
+          <View style={styles.chipContainer}>
+            {profile.sports?.map((sport, i) => (
+              <Chip key={i} style={styles.chip}>{sport}</Chip>
+            ))}
+          </View>
+          
+          <Text style={styles.sectionTitle}>Availability</Text>
+          <View style={styles.chipContainer}>
+            {profile.availability?.map((time, i) => (
+              <Chip key={i} style={styles.chip}>{time}</Chip>
+            ))}
+          </View>
+          
+          <Text style={styles.sectionTitle}>Lifting Expertise</Text>
+          <View style={styles.chipContainer}>
+            {profile.liftingExpertise?.map((level, i) => (
+              <Chip key={i} style={styles.chip}>{level}</Chip>
+            ))}
+          </View>
+          
+          <Text style={styles.sectionTitle}>Goals</Text>
+          <Text style={styles.text}>{profile.goals}</Text>
+          
+          <Text style={styles.sectionTitle}>Fun Fact</Text>
+          <Text style={styles.text}>{profile.funFact}</Text>
         </Card.Content>
       </Card>
 
@@ -267,7 +315,12 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     flex: 1,
   },
-  name: { marginBottom: 10 },
+  name: { marginBottom: 5 },
+  major: { 
+    fontSize: 16, 
+    color: '#666',
+    marginBottom: 10,
+  },
   imageContainer: { position: 'relative' },
   image: { width: 350, height: 350, borderRadius: 10 },
   promptRow: { marginVertical: 5 },
@@ -286,5 +339,23 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginTop: 10,
+    marginBottom: 5,
+  },
+  chipContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginBottom: 10,
+  },
+  chip: {
+    margin: 3,
+  },
+  text: {
+    fontSize: 16,
+    marginBottom: 10,
   },
 });
