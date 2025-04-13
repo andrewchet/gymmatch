@@ -5,10 +5,8 @@ import { signOut } from 'firebase/auth';
 import { auth } from '../firebaseConfig';
 import OnboardingScreen from '../screens/OnboardingScreen';
 import QuestionnaireScreen from '../screens/QuestionnaireScreen';
-import HomeScreen from '../screens/HomeScreen';
-import BrowseScreen from '../screens/BrowseScreen';
-import ChatListScreen from '../screens/ChatListScreen';
 import ChatScreen from '../screens/ChatScreen';
+import BottomTabNavigator from './BottomTabNavigator';
 
 const Stack = createStackNavigator();
 
@@ -54,8 +52,8 @@ const AppNavigator = () => {
         }}
       />
       <Stack.Screen 
-        name="Home" 
-        component={HomeScreen}
+        name="MainApp" 
+        component={BottomTabNavigator}
         options={({ navigation }) => ({ 
           title: 'FitMatch',
           headerLeft: null, // Disable back button for home
@@ -67,20 +65,7 @@ const AppNavigator = () => {
             />
           ),
         })}
-      />
-      <Stack.Screen 
-        name="Browse" 
-        component={BrowseScreen}
-        options={{ 
-          title: 'Explore Profiles',
-        }}
-      />
-      <Stack.Screen 
-        name="ChatList" 
-        component={ChatListScreen}
-        options={{ 
-          title: 'Messages',
-        }}
+        initialParams={{ screen: 'BrowseTab' }}
       />
       <Stack.Screen 
         name="Chat" 

@@ -1,7 +1,7 @@
 // screens/QuestionnaireScreen.js
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, Alert, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
-import { TextInput, Button, Text, Chip, Checkbox } from 'react-native-paper';
+import { TextInput, Button, Text, Chip, Checkbox, IconButton } from 'react-native-paper';
 import { doc, updateDoc, getDoc } from 'firebase/firestore';
 import { auth, db } from '../firebaseConfig';
 
@@ -62,7 +62,7 @@ const QuestionnaireScreen = ({ navigation, route }) => {
           if (profileData.name && profileData.age && profileData.major && profileData.sports && profileData.availability && 
               profileData.liftingExpertise && profileData.goals && profileData.funFact) {
             console.log('Existing profile found, skipping questionnaire');
-            navigation.replace('Home');
+            navigation.replace('MainApp');
             return;
           }
         }
@@ -105,7 +105,7 @@ const QuestionnaireScreen = ({ navigation, route }) => {
         updatedAt: new Date().toISOString(),
       });
 
-      navigation.replace('Home');
+      navigation.replace('MainApp');
     } catch (error) {
       console.error('Error updating profile:', error);
       Alert.alert('Error', 'Failed to update profile');
@@ -140,6 +140,18 @@ const QuestionnaireScreen = ({ navigation, route }) => {
       style={styles.container}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0}
     >
+      {isEditMode && (
+        <View style={styles.topSaveButtonContainer}>
+          <IconButton
+            icon="check"
+            size={28}
+            mode="contained"
+            onPress={handleSubmit}
+            style={styles.topSaveButton}
+          />
+        </View>
+      )}
+      
       <ScrollView 
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
@@ -299,6 +311,15 @@ const styles = StyleSheet.create({
   },
   chip: {
     margin: 5,
+  },
+  topSaveButtonContainer: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    zIndex: 10,
+  },
+  topSaveButton: {
+    backgroundColor: '#4CAF50',
   },
 });
 

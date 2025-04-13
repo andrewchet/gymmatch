@@ -12,48 +12,19 @@ const HomeScreen = ({ navigation }) => (
 
     <View style={styles.contentContainer}>
       <Surface style={styles.card} elevation={3}>
-        <Text variant="titleMedium" style={styles.cardTitle}>Explore Profiles</Text>
+        <Text variant="titleMedium" style={styles.cardTitle}>Your Dashboard</Text>
         <Text variant="bodyMedium" style={styles.cardDescription}>
-          Discover potential workout partners based on your fitness preferences
+          Welcome to your fitness journey! Use the tabs below to explore profiles, chat with matches, and manage your profile.
         </Text>
-        <Button 
-          mode="contained" 
-          onPress={() => navigation.navigate('Browse')} 
-          style={styles.button}
-          icon="account-search"
-        >
-          Browse Profiles
-        </Button>
       </Surface>
       
       <Surface style={styles.card} elevation={3}>
-        <Text variant="titleMedium" style={styles.cardTitle}>Messages</Text>
+        <Text variant="titleMedium" style={styles.cardTitle}>Quick Tips</Text>
         <Text variant="bodyMedium" style={styles.cardDescription}>
-          Chat with your matched workout partners
+          • Use the Discover tab to find workout partners with similar interests{'\n'}
+          • Check your Messages tab to connect with your matches{'\n'}
+          • Keep your profile updated to improve your matching chances
         </Text>
-        <Button 
-          mode="outlined" 
-          onPress={() => navigation.navigate('ChatList')} 
-          style={styles.button}
-          icon="message"
-        >
-          Messages
-        </Button>
-      </Surface>
-      
-      <Surface style={styles.card} elevation={3}>
-        <Text variant="titleMedium" style={styles.cardTitle}>Your Profile</Text>
-        <Text variant="bodyMedium" style={styles.cardDescription}>
-          View and edit your profile information
-        </Text>
-        <Button 
-          mode="outlined" 
-          onPress={() => navigation.navigate('Questionnaire', { editMode: true })} 
-          style={styles.button}
-          icon="account-edit"
-        >
-          Edit Profile
-        </Button>
       </Surface>
     </View>
   </View>

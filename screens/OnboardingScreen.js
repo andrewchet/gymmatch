@@ -63,7 +63,32 @@ const OnboardingScreen = ({ navigation }) => {
       } else {
         await signInWithEmailAndPassword(auth, email, password);
       }
-      navigation.replace('Questionnaire');
+      
+      // Check if the user has a complete profile
+      const user = auth.currentUser;
+      if (user) {
+        const profileRef = doc(db, 'profiles', user.uid);
+        const profileDoc = await getDoc(profileRef);
+        
+        if (profileDoc.exists()) {
+          const profileData = profileDoc.data();
+          // Check if the profile has all required fields
+          if (profileData.name && profileData.age && profileData.major && profileData.sports && 
+              profileData.availability && profileData.liftingExpertise && profileData.goals && profileData.funFact) {
+            // Profile is complete, navigate to MainApp
+            navigation.replace('MainApp');
+          } else {
+            // Profile is incomplete, navigate to Questionnaire
+            navigation.replace('Questionnaire');
+          }
+        } else {
+          // No profile document exists, navigate to Questionnaire
+          navigation.replace('Questionnaire');
+        }
+      } else {
+        // Fallback to Questionnaire if user is not found
+        navigation.replace('Questionnaire');
+      }
     } catch (error) {
       console.error('Auth Error:', error.code, error.message);
       let errorMessage = 'Authentication Error';
